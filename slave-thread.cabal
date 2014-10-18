@@ -1,0 +1,119 @@
+name:
+  slave-thread
+version:
+  0.1.0
+synopsis:
+  Slave thread
+description:
+  Vanilla thread management in Haskell is low level and 
+  it does not approach the problems related to thread deaths.
+  When it's used naively the following typical problems arise:
+  .
+  * When a forked thread dies due to an uncaught exception,
+  the exception does not get raised in the main thread,
+  which is why the program continues to run as if nothing happened,
+  i.e., with the presumption that the already dead thread is running normally.
+  It does not need an explanation 
+  that this may bring your program to a chaotic state.
+  .
+  * Another issue is that one thread dying does not
+  affect any of the threads forked from it.
+  That's why your program may be accumulating ghost threads.
+  .
+  * Ever dealt with your program ignoring the \<Ctrl-C\> strikes?
+  .
+  This library solves all the issues above with a concept of a slave thread.
+  A slave thread has the following properties:
+  .
+  1. When it dies for whatever reason (exception or finishing normally)
+  it kills all the slave threads that were forked from it.
+  This protects you from ghost threads.
+  .
+  2. It waits for all slaves to die and execute their finalizers 
+  before executing its own finalizer and getting released itself.
+  This gives you hierarchical releasing of resources.
+  .
+  3. When a slave thread dies with an uncaught exception
+  it reraises it in the parent thread.
+  This protects you from silent exceptions.
+  If your program is brought to an erroneous state 
+  you can be sure of getting informed.
+category:
+  Concurrency, Concurrent, Error Handling, Exceptions, Failure
+homepage:
+  https://github.com/nikita-volkov/slave-thread 
+bug-reports:
+  https://github.com/nikita-volkov/slave-thread/issues 
+author:
+  Nikita Volkov <nikita.y.volkov@mail.ru>
+maintainer:
+  Nikita Volkov <nikita.y.volkov@mail.ru>
+copyright:
+  (c) 2014, Nikita Volkov
+license:
+  MIT
+license-file:
+  LICENSE
+build-type:
+  Simple
+cabal-version:
+  >=1.10
+
+
+source-repository head
+  type:
+    git
+  location:
+    git://github.com/nikita-volkov/slave-thread.git
+
+
+library
+  hs-source-dirs:
+    library
+  other-modules:
+  exposed-modules:
+    SlaveThread
+  build-depends:
+    -- data:
+    stm-containers >= 0.2.0 && < 0.3,
+    -- control:
+    partial-handler >= 0.1.0 && < 0.2,
+    list-t >= 0.2.4 && < 0.3,
+    mmorph >= 1.0.4 && < 1.1,
+    transformers >= 0.3 && < 0.5,
+    -- general:
+    base-prelude >= 0.1.3 && < 0.2,
+    base >= 4.5 && < 4.8
+  ghc-options:
+    -funbox-strict-fields
+  default-extensions:
+    Arrows, BangPatterns, ConstraintKinds, DataKinds, DefaultSignatures, DeriveDataTypeable, DeriveFunctor, DeriveGeneric, EmptyDataDecls, FlexibleContexts, FlexibleInstances, FunctionalDependencies, GADTs, GeneralizedNewtypeDeriving, ImpredicativeTypes, LambdaCase, LiberalTypeSynonyms, MagicHash, MultiParamTypeClasses, MultiWayIf, NoImplicitPrelude, NoMonomorphismRestriction, OverloadedStrings, PatternGuards, ParallelListComp, QuasiQuotes, RankNTypes, RecordWildCards, ScopedTypeVariables, StandaloneDeriving, TemplateHaskell, TupleSections, TypeFamilies, TypeOperators, UnboxedTuples
+  default-language:
+    Haskell2010
+
+
+test-suite tests
+  type:             
+    exitcode-stdio-1.0
+  hs-source-dirs:   
+    tests
+  main-is:          
+    Main.hs
+  build-depends:
+    slave-thread,
+    -- testing:
+    HTF == 0.12.*,
+    quickcheck-instances == 0.3.*,
+    QuickCheck == 2.7.*,
+    HUnit == 1.2.*,
+    -- data:
+    base-prelude >= 0.1.3 && < 0.2,
+    base >= 4.5 && < 4.8
+  ghc-options:
+    -threaded
+    "-with-rtsopts=-N"
+    -funbox-strict-fields
+  default-extensions:
+    Arrows, BangPatterns, ConstraintKinds, DataKinds, DefaultSignatures, DeriveDataTypeable, DeriveFunctor, DeriveGeneric, EmptyDataDecls, FlexibleContexts, FlexibleInstances, FunctionalDependencies, GADTs, GeneralizedNewtypeDeriving, ImpredicativeTypes, LambdaCase, LiberalTypeSynonyms, MagicHash, MultiParamTypeClasses, MultiWayIf, NoImplicitPrelude, NoMonomorphismRestriction, OverloadedStrings, PatternGuards, ParallelListComp, QuasiQuotes, RankNTypes, RecordWildCards, ScopedTypeVariables, StandaloneDeriving, TemplateHaskell, TupleSections, TypeFamilies, TypeOperators, UnboxedTuples
+  default-language:
+    Haskell2010
