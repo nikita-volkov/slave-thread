@@ -31,6 +31,7 @@ fork main =
 -- due to being killed or an uncaught exception, or a normal termination.
 -- 
 -- Note the order of arguments:
+-- 
 -- >forkFinally finalizer computation
 forkFinally :: IO a -> IO b -> IO ThreadId
 forkFinally finalizer computation =
