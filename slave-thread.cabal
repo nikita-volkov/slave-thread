@@ -13,8 +13,7 @@ description:
   the exception does not get raised in the main thread,
   which is why the program continues to run as if nothing happened,
   i.e., with the presumption that the already dead thread is running normally.
-  It does not need an explanation 
-  that this may bring your program to a chaotic state.
+  Naturally this may very well bring your program to a chaotic state.
   .
   * Another issue is that one thread dying does not
   affect any of the threads forked from it.
@@ -34,10 +33,10 @@ description:
   This gives you hierarchical releasing of resources.
   .
   3. When a slave thread dies with an uncaught exception
-  it reraises it in the parent thread.
-  This protects you from silent exceptions.
-  If your program is brought to an erroneous state 
-  you can be sure of getting informed.
+  it reraises it in the master thread.
+  This protects you from silent exceptions 
+  and lets you be sure of getting informed
+  if your program gets brought to an erroneous state.
 category:
   Concurrency, Concurrent, Error Handling, Exceptions, Failure
 homepage:
