@@ -32,7 +32,7 @@ fork main =
 -- The finalizer gets executed when the thread dies for whatever reason:
 -- due to being killed or an uncaught exception, or a normal termination.
 -- 
--- Note that the order of arguments:
+-- Note the order of arguments:
 -- >forkFinally finalizer computation
 forkFinally :: IO a -> IO b -> IO ThreadId
 forkFinally finalizer computation =
