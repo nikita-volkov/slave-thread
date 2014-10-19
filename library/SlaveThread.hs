@@ -2,8 +2,6 @@ module SlaveThread
 (
   fork,
   forkFinally,
-  kill,
-  killBlocking,
 )
 where
 
@@ -74,16 +72,3 @@ waitForSlavesToDie thread =
     if null
       then return ()
       else retry
-
--- |
--- Just an alias to 'killThread'.
-kill :: ThreadId -> IO ()
-kill = killThread
-
--- |
--- Same as 'kill', but blocks until the slave thread actually dies.
-killBlocking :: ThreadId -> IO ()
-killBlocking thread =
-  do
-    killThread thread
-    waitForSlavesToDie thread

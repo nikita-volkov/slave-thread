@@ -40,7 +40,7 @@ test_killingAThreadKillsDeepSlaves =
           threadDelay $ 10^6
         threadDelay $ 10^6
     threadDelay $ 10^4
-    S.killBlocking thread
+    killThread thread
     assertEqual 1 =<< readIORef var
 
 test_dyingNormallyKillsSlaves = 
