@@ -15,12 +15,14 @@ import qualified ListT
 
 -- |
 -- A global registry of all slave threads by their masters.
+{-# NOINLINE slaves #-}
 slaves :: Multimap.Multimap ThreadId ThreadId
 slaves =
-  unsafePerformIO $ Multimap.newIO
+  unsafePerformIO Multimap.newIO
 
 -- |
 -- Fork a slave thread to run a computation on.
+{-# INLINABLE fork #-}
 fork :: IO a -> IO ThreadId
 fork main =
   forkFinally (return ()) main
@@ -33,6 +35,7 @@ fork main =
 -- Note the order of arguments:
 -- 
 -- >forkFinally finalizer computation
+{-# INLINABLE forkFinally #-}
 forkFinally :: IO a -> IO b -> IO ThreadId
 forkFinally finalizer computation =
   do
