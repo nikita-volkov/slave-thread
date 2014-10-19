@@ -3,7 +3,7 @@ name:
 version:
   0.1.0
 synopsis:
-  Slave thread
+  A solution to ghost threads and silent exceptions
 description:
   Vanilla thread management in Haskell is low level and 
   it does not approach the problems related to thread deaths.
