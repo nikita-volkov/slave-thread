@@ -39,9 +39,11 @@ forkFinally :: IO a -> IO b -> IO ThreadId
 forkFinally finalizer computation =
   do
     masterThread <- myThreadId
+    semaphore <- newEmptyMVar
     slaveThread <- 
       BasePrelude.forkFinally computation $ \r -> do
         slaveThread <- myThreadId
+        takeMVar semaphore
         -- Context management:
         killSlaves slaveThread
         waitForSlavesToDie slaveThread
@@ -54,6 +56,7 @@ forkFinally finalizer computation =
         -- thus informing the master of this thread's death.
         atomically $ Multimap.delete slaveThread masterThread slaves
     atomically $ Multimap.insert slaveThread masterThread slaves
+    putMVar semaphore ()
     return slaveThread
   where
     left = either Just (const Nothing)
