@@ -21,12 +21,12 @@ test_forkedThreadsRunFine =
         increment
       S.fork $ do
         increment
-      threadDelay $ 10^4
-    threadDelay $ 10^3
+      threadDelay $ 10^5
+    threadDelay $ 20 * 10^3
     assertEqual 3 =<< readIORef var
 
 test_killingAThreadKillsDeepSlaves = 
-  replicateM 100 $ do
+  replicateM 1000 $ do
     var <- newIORef 0
     let increment = modifyIORef var (+1)
     thread <- 
@@ -58,7 +58,7 @@ test_dyingNormallyKillsSlaves =
     assertEqual 0 =<< readIORef var
 
 test_finalizationOrder = 
-  replicateM 100 $ do
+  replicateM 1000 $ do
     var <- newIORef 0
     S.forkFinally (modifyIORef var (*2)) $ do
       S.forkFinally (modifyIORef var (+1)) $ return ()
