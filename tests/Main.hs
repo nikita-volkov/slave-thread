@@ -13,7 +13,7 @@ main =
 
 
 test_forkedThreadsRunFine = 
-  replicateM 100 $ do
+  replicateM 1000 $ do
     var <- newIORef 0
     let increment = modifyIORef var (+1)
     semaphore <- SSem.new 0
@@ -32,9 +32,8 @@ test_forkedThreadsRunFine =
     assertEqual 3 =<< readIORef var
 
 test_killingAThreadKillsDeepSlaves = 
-  replicateM 100 $ do
-    var <- newIORef 0
-    let increment = modifyIORef var (+1)
+  replicateM 100000 $ do
+    var <- newMVar 0
     semaphore <- SSem.new 0
     thread <- 
       S.forkFinally (SSem.signal semaphore) $ do
@@ -42,16 +41,17 @@ test_killingAThreadKillsDeepSlaves =
           join $ forkWait $ do
             w <- forkWait $ do
               threadDelay $ 10^6
-              increment
+              modifyMVar_ var (return . succ)
             threadDelay $ 10^6
-            increment
+            modifyMVar_ var (return . succ)
             w
+    threadDelay $ 10
     killThread thread
     SSem.wait semaphore
-    assertEqual 0 =<< readIORef var
+    assertEqual 0 =<< readMVar var
 
 test_dyingNormallyKillsSlaves = 
-  replicateM 100 $ do
+  replicateM 1000 $ do
     var <- newIORef 0
     let increment = modifyIORef var (+1)
     semaphore <- SSem.new 0
