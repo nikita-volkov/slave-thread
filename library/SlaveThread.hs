@@ -75,9 +75,8 @@ forkFinally :: IO a -> IO b -> IO ThreadId
 forkFinally finalizer computation =
   mask $ \unmask -> do
     masterThread <- myThreadId
-    -- Ensures that the thread gets registered before executing the forked
-    -- computation
-    gate <- newEmptyMVar
+    -- Ensures that the thread gets registered before being unregistered
+    registrationPass <- newEmptyMVar
     slaveThread <-
       forkIOWithoutHandler $ do
         slaveThread <- myThreadId
@@ -93,10 +92,10 @@ forkFinally finalizer computation =
             PartialHandler.onThreadKilled (return ())
         -- Unregister from the global state,
         -- thus informing the master of this thread's death.
-        takeMVar gate
+        takeMVar registrationPass
         atomically $ Multimap.delete slaveThread masterThread slaves
     atomically $ Multimap.insert slaveThread masterThread slaves
-    putMVar gate ()
+    putMVar registrationPass ()
     return slaveThread
   where
     left = either Just (const Nothing)
