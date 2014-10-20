@@ -76,20 +76,20 @@ forkFinally finalizer computation =
     -- Ensures that the thread gets registered before this function returns.
     semaphore <- newEmptyMVar
     slaveThread <-
-      mask $ \restore -> forkIO $ do
+      mask $ \unmask -> forkIO $ do
         slaveThread <- myThreadId
         atomically $ Multimap.insert slaveThread masterThread slaves
         putMVar semaphore ()
-        r <- try $ restore computation
+        computationException <- fmap left $ try $ unmask computation
         -- Context management:
         killSlaves slaveThread
         waitForSlavesToDie slaveThread
-        -- Finalization and rethrowing of exceptions into the master thread:
-        forM_ (left r) $ 
+        -- Finalization:
+        finalizerException <- fmap left $ try $ finalizer
+        -- Rethrowing of exceptions into the master thread:
+        forM_ (computationException <|> finalizerException) $ 
           PartialHandler.totalizeRethrowingTo_ masterThread $ 
             PartialHandler.onThreadKilled (return ())
-        try finalizer >>= \r ->
-          forM_ (left r) $ PartialHandler.totalizeRethrowingTo_ masterThread $ mempty
         -- Unregister from the global state,
         -- thus informing the master of this thread's death.
         atomically $ Multimap.delete slaveThread masterThread slaves

@@ -1,7 +1,7 @@
 name:
   slave-thread
 version:
-  0.1.1
+  0.1.2
 synopsis:
   A solution to ghost threads and silent exceptions
 description:
