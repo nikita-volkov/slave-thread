@@ -71,12 +71,12 @@ fork main =
 {-# INLINABLE forkFinally #-}
 forkFinally :: IO a -> IO b -> IO ThreadId
 forkFinally finalizer computation =
-  do
+  mask $ \unmask -> do
     masterThread <- myThreadId
     -- Ensures that the thread gets registered before this function returns.
     gate <- newEmptyMVar
     slaveThread <-
-      mask $ \unmask -> forkIO $ do
+      forkIO $ do
         slaveThread <- myThreadId
         atomically $ Multimap.insert slaveThread masterThread slaves
         putMVar gate ()
