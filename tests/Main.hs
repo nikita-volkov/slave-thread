@@ -13,9 +13,9 @@ main =
 
 
 test_forkedThreadsRunFine = 
-  replicateM 1000 $ do
-    var <- newIORef 0
-    let increment = modifyIORef var (+1)
+  replicateM 100000 $ do
+    var <- newMVar 0
+    let increment = modifyMVar_ var (return . succ)
     semaphore <- SSem.new 0
     S.fork $ do
       increment
@@ -29,7 +29,7 @@ test_forkedThreadsRunFine =
       SSem.wait semaphore'
       SSem.signal semaphore
     SSem.wait semaphore
-    assertEqual 3 =<< readIORef var
+    assertEqual 3 =<< readMVar var
 
 test_killingAThreadKillsDeepSlaves = 
   replicateM 100000 $ do
@@ -45,13 +45,12 @@ test_killingAThreadKillsDeepSlaves =
             threadDelay $ 10^6
             modifyMVar_ var (return . succ)
             w
-    threadDelay $ 10
     killThread thread
     SSem.wait semaphore
     assertEqual 0 =<< readMVar var
 
 test_dyingNormallyKillsSlaves = 
-  replicateM 1000 $ do
+  replicateM 100000 $ do
     var <- newIORef 0
     let increment = modifyIORef var (+1)
     semaphore <- SSem.new 0
@@ -66,25 +65,20 @@ test_dyingNormallyKillsSlaves =
     assertEqual 0 =<< readIORef var
 
 test_finalizationOrder = 
-  replicateM 1000 $ do
+  replicateM 100000 $ do
     var <- newMVar []
     semaphore <- SSem.new 0
     S.forkFinally (modifyMVar_ var (return . (1:)) >> SSem.signal semaphore) $ do
-      semaphore <- SSem.new 0
-      S.forkFinally (modifyMVar_ var (return . (2:)) >> SSem.signal semaphore) $ do
+      semaphore' <- SSem.new 0
+      S.forkFinally (modifyMVar_ var (return . (2:)) >> SSem.signal semaphore') $ do
         S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
         S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
-        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
-        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
-        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
-        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
-        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
-      SSem.wait semaphore
+      SSem.wait semaphore'
     SSem.wait semaphore
-    assertEqual [1,2,3,3,3,3,3,3,3] =<< readMVar var
+    assertEqual [1,2,3,3] =<< readMVar var
 
 test_exceptionsDontGetLost = 
-  replicateM 100 $ do
+  replicateM 1000 $ do
     assertThrowsSomeIO $ do
       S.fork $ do
         S.fork $ do
