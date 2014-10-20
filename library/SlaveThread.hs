@@ -106,6 +106,4 @@ waitForSlavesToDie :: ThreadId -> IO ()
 waitForSlavesToDie thread =
   atomically $ do
     null <- ListT.null $ Multimap.streamByKey thread slaves
-    if null
-      then return ()
-      else retry
+    when (not null) retry
