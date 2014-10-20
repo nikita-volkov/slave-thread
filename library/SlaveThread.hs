@@ -74,12 +74,12 @@ forkFinally finalizer computation =
   do
     masterThread <- myThreadId
     -- Ensures that the thread gets registered before this function returns.
-    semaphore <- newEmptyMVar
+    gate <- newEmptyMVar
     slaveThread <-
       mask $ \unmask -> forkIO $ do
         slaveThread <- myThreadId
         atomically $ Multimap.insert slaveThread masterThread slaves
-        putMVar semaphore ()
+        putMVar gate ()
         computationException <- fmap left $ try $ unmask computation
         -- Context management:
         killSlaves slaveThread
@@ -93,7 +93,7 @@ forkFinally finalizer computation =
         -- Unregister from the global state,
         -- thus informing the master of this thread's death.
         atomically $ Multimap.delete slaveThread masterThread slaves
-    takeMVar semaphore
+    takeMVar gate
     return slaveThread
   where
     left = either Just (const Nothing)
