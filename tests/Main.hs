@@ -38,12 +38,14 @@ test_killingAThreadKillsDeepSlaves =
     semaphore <- SSem.new 0
     thread <- 
       S.forkFinally (SSem.signal semaphore) $ do
-        w <- forkWait $ do
-          w <- forkWait $ do
-            threadDelay $ 20*10^3
+        join $ forkWait $ do
+          join $ forkWait $ do
+            w <- forkWait $ do
+              threadDelay $ 10^6
+              increment
+            threadDelay $ 10^6
             increment
-          w
-        w
+            w
     killThread thread
     SSem.wait semaphore
     assertEqual 0 =<< readIORef var
@@ -55,23 +57,31 @@ test_dyingNormallyKillsSlaves =
     semaphore <- SSem.new 0
     S.forkFinally (SSem.signal semaphore) $ do
       S.fork $ do
-        threadDelay $ 10^4
+        threadDelay $ 10^6
         increment
       S.fork $ do
-        threadDelay $ 10^4
+        threadDelay $ 10^6
         increment
     SSem.wait semaphore
     assertEqual 0 =<< readIORef var
 
 test_finalizationOrder = 
   replicateM 1000 $ do
-    var <- newIORef 0
+    var <- newMVar []
     semaphore <- SSem.new 0
-    S.forkFinally (modifyIORef var (*2) >> SSem.signal semaphore) $ do
-      S.forkFinally (modifyIORef var (+1)) $ return ()
-      S.forkFinally (modifyIORef var (+1)) $ return ()
+    S.forkFinally (modifyMVar_ var (return . (1:)) >> SSem.signal semaphore) $ do
+      semaphore <- SSem.new 0
+      S.forkFinally (modifyMVar_ var (return . (2:)) >> SSem.signal semaphore) $ do
+        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
+        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
+        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
+        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
+        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
+        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
+        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
+      SSem.wait semaphore
     SSem.wait semaphore
-    assertEqual 4 =<< readIORef var
+    assertEqual [1,2,3,3,3,3,3,3,3] =<< readMVar var
 
 test_exceptionsDontGetLost = 
   replicateM 100 $ do
