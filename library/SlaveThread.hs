@@ -87,9 +87,11 @@ forkFinally finalizer computation =
         -- Finalization:
         finalizerException <- fmap left $ try $ finalizer
         -- Rethrowing of exceptions into the master thread:
-        forM_ (computationException <|> finalizerException) $ 
+        forM_ computationException $ 
           PartialHandler.totalizeRethrowingTo_ masterThread $ 
             PartialHandler.onThreadKilled (return ())
+        forM_ finalizerException $ 
+          PartialHandler.totalizeRethrowingTo_ masterThread $ mempty
         -- Unregister from the global state,
         -- thus informing the master of this thread's death.
         takeMVar registrationPass
