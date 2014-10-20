@@ -68,11 +68,11 @@ test_finalizationOrder =
   replicateM 100000 $ do
     var <- newMVar []
     semaphore <- SSem.new 0
-    S.forkFinally (modifyMVar_ var (return . (1:)) >> SSem.signal semaphore) $ do
+    S.forkFinally (uninterruptibleMask_ (modifyMVar_ var (return . (1:)) >> SSem.signal semaphore)) $ do
       semaphore' <- SSem.new 0
-      S.forkFinally (modifyMVar_ var (return . (2:)) >> SSem.signal semaphore') $ do
-        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
-        S.forkFinally (modifyMVar_ var (return . (3:))) $ return ()
+      S.forkFinally (uninterruptibleMask_ (modifyMVar_ var (return . (2:)) >> SSem.signal semaphore')) $ do
+        S.forkFinally (uninterruptibleMask_ (modifyMVar_ var (return . (3:)))) $ return ()
+        S.forkFinally (uninterruptibleMask_ (modifyMVar_ var (return . (3:)))) $ return ()
       SSem.wait semaphore'
     SSem.wait semaphore
     assertEqual [1,2,3,3] =<< readMVar var
