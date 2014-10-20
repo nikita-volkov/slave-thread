@@ -41,6 +41,8 @@ where
 import BasePrelude hiding (forkFinally)
 import Control.Monad.Trans.Reader
 import Control.Monad.Morph
+import GHC.IO (IO(IO))
+import GHC.Exts (Int(I#), fork#, forkOn#)
 import qualified STMContainers.Multimap as Multimap
 import qualified PartialHandler
 import qualified ListT
@@ -77,7 +79,7 @@ forkFinally finalizer computation =
     -- computation
     gate <- newEmptyMVar
     slaveThread <-
-      forkIO $ do
+      forkIOWithoutHandler $ do
         slaveThread <- myThreadId
         computationException <- fmap left $ try $ unmask computation
         -- Context management:
@@ -108,3 +110,11 @@ waitForSlavesToDie thread =
   atomically $ do
     null <- ListT.null $ Multimap.streamByKey thread slaves
     when (not null) retry
+
+-- |
+-- A more efficient version of 'forkIO', 
+-- which does not install a default exception handler on the forked thread.
+{-# INLINE forkIOWithoutHandler #-}
+forkIOWithoutHandler :: IO () -> IO ThreadId
+forkIOWithoutHandler action = 
+  IO $ \s -> case (fork# action s) of (# s', tid #) -> (# s', ThreadId tid #)
