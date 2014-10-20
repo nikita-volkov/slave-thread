@@ -78,13 +78,13 @@ test_finalizationOrder =
     assertEqual [1,2,3,3] =<< readMVar var
 
 test_exceptionsDontGetLost = 
-  replicateM 1000 $ do
+  replicateM 100000 $ do
     assertThrowsSomeIO $ do
       S.fork $ do
         S.fork $ do
           error "!"
-        threadDelay $ 10^4
-      threadDelay $ 10^4
+        threadDelay $ 10^6
+      threadDelay $ 10^6
 
 forkWait :: IO a -> IO (IO ())
 forkWait io =

@@ -80,17 +80,14 @@ forkFinally finalizer computation =
     slaveThread <-
       forkIOWithoutHandler $ do
         slaveThread <- myThreadId
-        computationException <- fmap left $ try $ unmask computation
+        catch (void $ unmask computation) $
+          PartialHandler.totalizeRethrowingTo_ masterThread $ 
+            PartialHandler.onThreadKilled (return ())
         -- Context management:
         killSlaves slaveThread
         waitForSlavesToDie slaveThread
         -- Finalization:
-        finalizerException <- fmap left $ try $ finalizer
-        -- Rethrowing of exceptions into the master thread:
-        forM_ computationException $ 
-          PartialHandler.totalizeRethrowingTo_ masterThread $ 
-            PartialHandler.onThreadKilled (return ())
-        forM_ finalizerException $ 
+        catch (void finalizer) $
           PartialHandler.totalizeRethrowingTo_ masterThread $ mempty
         -- Unregister from the global state,
         -- thus informing the master of this thread's death.
@@ -99,8 +96,6 @@ forkFinally finalizer computation =
     atomically $ Multimap.insert slaveThread masterThread slaves
     putMVar registrationPass ()
     return slaveThread
-  where
-    left = either Just (const Nothing)
 
 killSlaves :: ThreadId -> IO ()
 killSlaves thread =
