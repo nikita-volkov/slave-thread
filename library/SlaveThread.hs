@@ -90,7 +90,7 @@ forkFinally finalizer computation =
         catch (void finalizer) $
           PartialHandler.totalizeRethrowingTo_ masterThread $ mempty
         -- Unregister from the global state,
-        -- thus informing the master of this thread's death.
+        -- thus informing the master of this thread's death:
         takeMVar registrationPass
         atomically $ Multimap.delete slaveThread masterThread slaves
     atomically $ Multimap.insert slaveThread masterThread slaves
@@ -105,7 +105,7 @@ waitForSlavesToDie :: ThreadId -> IO ()
 waitForSlavesToDie thread =
   atomically $ do
     null <- ListT.null $ Multimap.streamByKey thread slaves
-    when (not null) retry
+    unless null retry
 
 -- |
 -- A more efficient version of 'forkIO', 
