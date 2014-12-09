@@ -59,8 +59,8 @@ slaves =
 -- Fork a slave thread to run a computation on.
 {-# INLINABLE fork #-}
 fork :: IO a -> IO ThreadId
-fork main =
-  forkFinally (return ()) main
+fork =
+  forkFinally $ return ()
 
 -- |
 -- Fork a slave thread with a finalizer action to run a computation on.
@@ -76,7 +76,7 @@ forkFinally finalizer computation =
   mask $ \unmask -> do
     masterThread <- myThreadId
     -- Ensures that the thread gets registered before being unregistered
-    registrationPass <- newEmptyMVar
+    registrationGate <- newEmptyMVar
     slaveThread <-
       forkIOWithoutHandler $ do
         slaveThread <- myThreadId
@@ -91,10 +91,10 @@ forkFinally finalizer computation =
           PartialHandler.totalizeRethrowingTo_ masterThread $ mempty
         -- Unregister from the global state,
         -- thus informing the master of this thread's death:
-        takeMVar registrationPass
+        takeMVar registrationGate
         atomically $ Multimap.delete slaveThread masterThread slaves
     atomically $ Multimap.insert slaveThread masterThread slaves
-    putMVar registrationPass ()
+    putMVar registrationGate ()
     return slaveThread
 
 killSlaves :: ThreadId -> IO ()
