@@ -1,7 +1,7 @@
 name:
   slave-thread
 version:
-  0.1.4
+  0.1.5
 synopsis:
   A principal solution to ghost threads and silent exceptions
 description:
@@ -77,7 +77,7 @@ library
     stm-containers >= 0.2.0 && < 0.3,
     -- control:
     partial-handler >= 0.1.0 && < 0.2,
-    list-t >= 0.2.4 && < 0.4,
+    list-t >= 0.2.4 && < 0.5,
     mmorph >= 1.0.4 && < 1.1,
     transformers >= 0.2 && < 0.5,
     -- general:
