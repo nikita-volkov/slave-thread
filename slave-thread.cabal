@@ -1,7 +1,7 @@
 name:
   slave-thread
 version:
-  1.0.0.0
+  1.0.1
 synopsis:
   A principal solution to ghost threads and silent exceptions
 description:
@@ -74,15 +74,15 @@ library
     SlaveThread
   build-depends:
     -- data:
-    stm-containers >= 0.2.0 && < 0.3,
+    stm-containers >= 0.2 && < 0.3,
     -- control:
-    partial-handler >= 0.1.0 && < 1.1,
+    partial-handler >= 0.1 && < 2,
     list-t >= 0.2.4 && < 0.5,
-    mmorph >= 1.0.4 && < 1.1,
-    transformers >= 0.3 && < 0.5,
+    mmorph >= 1.0.4 && < 2,
+    transformers >= 0.3 && < 0.6,
     -- general:
-    base-prelude >= 0.1.19 && < 0.2,
-    base >= 4.6 && < 4.9
+    base-prelude >= 0.1.19 && < 2,
+    base >= 4.6 && < 5
   ghc-options:
     -funbox-strict-fields
   default-extensions:
@@ -101,13 +101,13 @@ test-suite tests
   build-depends:
     slave-thread,
     -- testing:
-    HTF == 0.12.*,
+    HTF == 0.13.*,
     quickcheck-instances == 0.3.*,
-    QuickCheck >= 2.6 && < 2.8,
+    QuickCheck >= 2.6 && < 3,
     -- general:
     SafeSemaphore == 0.10.*,
-    base-prelude >= 0.1.19 && < 0.2,
-    base >= 4.6 && < 4.9
+    base-prelude,
+    base
   ghc-options:
     -threaded
     "-with-rtsopts=-N"
