@@ -38,14 +38,23 @@ module SlaveThread
 )
 where
 
-import BasePrelude hiding (forkFinally)
-import Control.Monad.Trans.Reader
+import Prelude
+import Data.Foldable
+import Data.Traversable
+import Control.Applicative
+import Control.Concurrent hiding (forkFinally)
+import Control.Exception
+import Control.Monad
 import Control.Monad.Morph
-import GHC.IO (IO(IO))
+import Control.Monad.Trans.Reader
+import GHC.Conc
 import GHC.Exts (Int(I#), fork#, forkOn#)
-import qualified STMContainers.Multimap as Multimap
+import GHC.IO (IO(IO))
+import System.IO.Unsafe
+import qualified DeferredFolds.UnfoldM as UnfoldM
 import qualified PartialHandler
-import qualified ListT
+import qualified StmContainers.Multimap as Multimap
+import qualified Control.Foldl as Foldl
 
 
 -- |
@@ -98,13 +107,14 @@ forkFinally finalizer computation =
     return slaveThread
 
 killSlaves :: ThreadId -> IO ()
-killSlaves thread =
-  ListT.traverse_ killThread $ hoist atomically $ Multimap.streamByKey thread slaves
+killSlaves thread = do
+  threads <- atomically (UnfoldM.foldM (Foldl.generalize Foldl.revList) (Multimap.unfoldMByKey thread slaves))
+  traverse_ killThread threads
 
 waitForSlavesToDie :: ThreadId -> IO ()
 waitForSlavesToDie thread =
   atomically $ do
-    null <- ListT.null $ Multimap.streamByKey thread slaves
+    null <- UnfoldM.null $ Multimap.unfoldMByKey thread slaves
     unless null retry
 
 -- |

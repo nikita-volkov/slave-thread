@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -F -pgmF htfpp #-}
 module Main where
 
-import BasePrelude
+import Prelude
 import Test.Framework
 import Test.QuickCheck.Instances
 import qualified SlaveThread as S

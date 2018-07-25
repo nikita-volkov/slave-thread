@@ -75,18 +75,18 @@ library
     SlaveThread
   build-depends:
     base >=4.6 && <5,
-    base-prelude >=0.1.19 && <2,
-    list-t >=0.2.4 && <2,
+    deferred-folds >=0.6.7 && <0.7,
+    foldl >=1 && <2,
     mmorph >=1.0.4 && <2,
-    partial-handler >=0.1 && <2,
-    stm-containers >=0.2 && <0.3,
-    transformers >=0.3 && <0.6
+    partial-handler >=1 && <2,
+    stm-containers >=1 && <1.1,
+    transformers >=0.5 && <0.6
 
-test-suite tests
+test-suite test
   type:             
     exitcode-stdio-1.0
   hs-source-dirs:   
-    tests
+    test
   default-extensions:
     Arrows, BangPatterns, ConstraintKinds, DataKinds, DefaultSignatures, DeriveDataTypeable, DeriveFoldable, DeriveFunctor, DeriveGeneric, DeriveTraversable, EmptyDataDecls, FlexibleContexts, FlexibleInstances, FunctionalDependencies, GADTs, GeneralizedNewtypeDeriving, LambdaCase, LiberalTypeSynonyms, MagicHash, MultiParamTypeClasses, MultiWayIf, NoImplicitPrelude, NoMonomorphismRestriction, OverloadedStrings, PatternGuards, PatternSynonyms, ParallelListComp, QuasiQuotes, RankNTypes, RecordWildCards, ScopedTypeVariables, StandaloneDeriving, TemplateHaskell, TupleSections, TypeFamilies, TypeOperators, UnboxedTuples
   default-language:
@@ -98,10 +98,9 @@ test-suite tests
   main-is:          
     Main.hs
   build-depends:
-    base,
-    base-prelude,
     HTF ==0.13.*,
     QuickCheck >=2.6 && <3,
     quickcheck-instances ==0.3.*,
+    rerebase >=1 && <2,
     SafeSemaphore ==0.10.*,
     slave-thread
