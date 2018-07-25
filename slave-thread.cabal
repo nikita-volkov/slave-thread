@@ -3,7 +3,7 @@ name:
 version:
   1.0.2
 synopsis:
-  A principal solution to ghost threads and silent exceptions
+  A fundamental solution to ghost threads and silent exceptions
 description:
   Vanilla thread management in Haskell is low level and 
   it does not approach the problems related to thread deaths.
