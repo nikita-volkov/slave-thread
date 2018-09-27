@@ -51,7 +51,7 @@ import GHC.Conc
 import GHC.Exts (Int(I#), fork#, forkOn#)
 import GHC.IO (IO(IO))
 import System.IO.Unsafe
-import qualified DeferredFolds.UnfoldM as UnfoldM
+import qualified DeferredFolds.UnfoldlM as UnfoldlM
 import qualified PartialHandler
 import qualified StmContainers.Multimap as Multimap
 import qualified Control.Foldl as Foldl
@@ -108,13 +108,13 @@ forkFinally finalizer computation =
 
 killSlaves :: ThreadId -> IO ()
 killSlaves thread = do
-  threads <- atomically (UnfoldM.foldM (Foldl.generalize Foldl.revList) (Multimap.unfoldMByKey thread slaves))
+  threads <- atomically (UnfoldlM.foldM (Foldl.generalize Foldl.revList) (Multimap.unfoldMByKey thread slaves))
   traverse_ killThread threads
 
 waitForSlavesToDie :: ThreadId -> IO ()
 waitForSlavesToDie thread =
   atomically $ do
-    null <- UnfoldM.null $ Multimap.unfoldMByKey thread slaves
+    null <- UnfoldlM.null $ Multimap.unfoldMByKey thread slaves
     unless null retry
 
 -- |
