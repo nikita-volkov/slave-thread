@@ -1,5 +1,5 @@
 -- |
--- Vanilla thread management in Haskell is low level and 
+-- Vanilla thread management in Haskell is low level and
 -- it does not approach the problems related to thread deaths.
 -- When it's used naively the following typical problems arise:
 --
@@ -22,13 +22,13 @@
 -- it kills all the slave threads that were forked from it.
 -- This protects you from ghost threads.
 --
--- 2. It waits for all slaves to die and execute their finalizers 
+-- 2. It waits for all slaves to die and execute their finalizers
 -- before executing its own finalizer and getting released itself.
 -- This gives you hierarchical releasing of resources.
 --
 -- 3. When a slave thread dies with an uncaught exception
 -- it reraises it in the master thread.
--- This protects you from silent exceptions 
+-- This protects you from silent exceptions
 -- and lets you be sure of getting informed
 -- if your program gets brought to an erroneous state.
 module SlaveThread
@@ -49,7 +49,7 @@ import Control.Monad.Morph
 import Control.Monad.Trans.Reader
 import GHC.Conc
 import GHC.Exts (Int(I#), fork#, forkOn#)
-import GHC.IO (IO(IO))
+import GHC.IO (IO(IO), unsafeUnmask)
 import System.IO.Unsafe
 import qualified DeferredFolds.UnfoldlM as UnfoldlM
 import qualified PartialHandler
@@ -75,19 +75,19 @@ fork =
 -- Fork a slave thread with a finalizer action to run a computation on.
 -- The finalizer gets executed when the thread dies for whatever reason:
 -- due to being killed or an uncaught exception, or a normal termination.
--- 
+--
 -- Note the order of arguments:
--- 
+--
 -- >forkFinally finalizer computation
 {-# INLINABLE forkFinally #-}
 forkFinally :: IO a -> IO b -> IO ThreadId
 forkFinally finalizer computation =
-  mask $ \unmask -> do
+  mask_ $ do
     masterThread <- myThreadId
     -- Ensures that the thread gets registered before being unregistered
     registrationGate <- newEmptyMVar
     slaveThread <-
-      forkIOWithoutHandler $ do
+      forkIOWithUnmaskWithoutHandler $ \unmask -> do
         slaveThread <- myThreadId
         catch
           (unmask (void computation))
@@ -122,9 +122,9 @@ waitForSlavesToDie thread =
     unless null retry
 
 -- |
--- A more efficient version of 'forkIO', 
+-- A more efficient version of 'forkIOWithUnmask',
 -- which does not install a default exception handler on the forked thread.
-{-# INLINE forkIOWithoutHandler #-}
-forkIOWithoutHandler :: IO () -> IO ThreadId
-forkIOWithoutHandler action = 
-  IO $ \s -> case (fork# action s) of (# s', tid #) -> (# s', ThreadId tid #)
+{-# INLINE forkIOWithUnmaskWithoutHandler #-}
+forkIOWithUnmaskWithoutHandler :: ((forall a. IO a -> IO a) -> IO ()) -> IO ThreadId
+forkIOWithUnmaskWithoutHandler action =
+  IO $ \s -> case (fork# (action unsafeUnmask)  s) of (# s', tid #) -> (# s', ThreadId tid #)
