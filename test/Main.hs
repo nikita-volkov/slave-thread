@@ -12,6 +12,26 @@ main =
   htfMain $ htf_thisModulesTests
 
 
+test_failingInFinalizerDoesntBreakEverything =
+  do
+    finalizer1CalledVar <- newTVarIO False
+    finalizer2CalledVar <- newTVarIO False
+    let
+      finalizer1 =
+        atomically $ writeTVar finalizer1CalledVar True
+      finalizer2 =
+        do
+          atomically $ writeTVar finalizer2CalledVar True
+          throwIO (userError "finalizer2 failed")
+      in do
+        S.forkFinally finalizer1 $ do
+          S.forkFinally finalizer2 $ threadDelay 1000
+        threadDelay (10^6)
+        finalizer2Called <- atomically (readTVar finalizer2CalledVar)
+        finalizer1Called <- atomically (readTVar finalizer1CalledVar)
+        assertEqual True finalizer2Called
+        assertEqual True finalizer1Called
+
 test_forkedThreadsRunFine = 
   replicateM 100000 $ do
     var <- newMVar 0
