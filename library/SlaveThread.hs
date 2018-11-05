@@ -89,12 +89,14 @@ forkFinally finalizer computation =
     slaveThread <-
       forkIOWithoutHandler $ do
         slaveThread <- myThreadId
-        catch (void $ unmask computation) $
-          PartialHandler.totalizeRethrowingTo_ masterThread $ 
-            PartialHandler.onThreadKilled (return ())
-        -- Context management:
-        killSlaves slaveThread
-        waitForSlavesToDie slaveThread
+        catch
+          (unmask $ do
+            computation
+            -- Context management:
+            killSlaves slaveThread
+            waitForSlavesToDie slaveThread)
+          (PartialHandler.totalizeRethrowingTo_ masterThread
+            (PartialHandler.onThreadKilled (return ())))
         -- Finalization:
         catch (void finalizer) $
           PartialHandler.totalizeRethrowingTo_ masterThread $ mempty

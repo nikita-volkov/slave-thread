@@ -24,9 +24,11 @@ test_failingInFinalizerDoesntBreakEverything =
           atomically $ writeTVar finalizer2CalledVar True
           throwIO (userError "finalizer2 failed")
       in do
-        S.forkFinally finalizer1 $ do
-          S.forkFinally finalizer2 $ threadDelay 1000
-        threadDelay (10^6)
+        result :: Either SomeException () <- try $ do
+          S.forkFinally finalizer1 $ do
+            S.forkFinally finalizer2 $ threadDelay 100
+          threadDelay (10^4)
+        assertEqual "Left user error (finalizer2 failed)" (show result)
         finalizer2Called <- atomically (readTVar finalizer2CalledVar)
         finalizer1Called <- atomically (readTVar finalizer1CalledVar)
         assertEqual True finalizer2Called
