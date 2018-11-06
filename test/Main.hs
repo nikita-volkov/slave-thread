@@ -18,7 +18,7 @@ main =
     testCase "Failing in finalizer doesn't break everything" $ do
       finalizer1CalledVar <- newTVarIO False
       finalizer2CalledVar <- newTVarIO False
-      let
+      result <- let
         finalizer1 =
           atomically $ writeTVar finalizer1CalledVar True
         finalizer2 =
@@ -26,15 +26,15 @@ main =
             atomically $ writeTVar finalizer2CalledVar True
             throwIO (userError "finalizer2 failed")
         in do
-          result <- try @SomeException $ do
+          try @SomeException $ do
             S.forkFinally finalizer1 $ do
               S.forkFinally finalizer2 $ threadDelay 100
-            threadDelay (10^4)
-          assertEqual "" "Left user error (finalizer2 failed)" (show result)
-          finalizer2Called <- atomically (readTVar finalizer2CalledVar)
-          finalizer1Called <- atomically (readTVar finalizer1CalledVar)
-          assertEqual "" True finalizer2Called
-          assertEqual "" True finalizer1Called
+      threadDelay (10^4)
+      assertEqual "" "Left user error (finalizer2 failed)" (show result)
+      finalizer2Called <- atomically (readTVar finalizer2CalledVar)
+      finalizer1Called <- atomically (readTVar finalizer1CalledVar)
+      assertEqual "" True finalizer2Called
+      assertEqual "" True finalizer1Called
     ,
     testCase "Forked threads run fine" $ do
       replicateM_ 100000 $ do
