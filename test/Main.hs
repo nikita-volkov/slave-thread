@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Concurrent.STM
 import Test.QuickCheck.Instances
 import Test.Tasty
 import Test.Tasty.Runners
@@ -110,6 +111,20 @@ main =
           threadDelay $ 10^6
         assertBool "" (isLeft result)
     ,
+    testCase "Slaves are finalized before master" $ do
+      replicateM_ 100000 $ do
+        ready <- newEmptyMVar
+        var <- newEmptyTMVarIO
+        thread <-
+          S.forkFinally (atomically (tryPutTMVar var 1)) $ do
+            S.forkFinally (atomically (tryPutTMVar var 0)) $
+              threadDelay $ 10^6
+            putMVar ready ()
+            threadDelay $ 10^6
+        takeMVar ready
+        killThread thread
+        assertEqual "First finalizer is not slave" 0 =<< atomically (readTMVar var)
+    ,
     testCase "Forked threads don't inherit the masking state" $ do
       var <- newEmptyMVar
       mask_ (S.fork (getMaskingState >>= putMVar var))
@@ -121,7 +136,7 @@ forkWait io =
   do
     v <- newEmptyMVar
     S.fork $ do
-      r <- try io
+      r <- try @SomeException io
       putMVar v ()
-      either (throwIO @SomeException) return r
+      either throwIO return r
     return $ takeMVar v
