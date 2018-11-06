@@ -52,7 +52,9 @@ import GHC.Exts (Int(I#), fork#, forkOn#)
 import GHC.IO (IO(IO))
 import System.IO.Unsafe
 import qualified DeferredFolds.UnfoldlM as UnfoldlM
+import qualified Focus
 import qualified PartialHandler
+import qualified StmContainers.Map as Map
 import qualified StmContainers.Multimap as Multimap
 import qualified Control.Foldl as Foldl
 
@@ -63,6 +65,13 @@ import qualified Control.Foldl as Foldl
 slaves :: Multimap.Multimap ThreadId ThreadId
 slaves =
   unsafePerformIO Multimap.newIO
+
+-- |
+-- A global registry of all master threads by their slaves.
+{-# NOINLINE masters #-}
+masters :: Map.Map ThreadId ThreadId
+masters =
+  unsafePerformIO Map.newIO
 
 -- |
 -- Fork a slave thread to run a computation on.
@@ -103,8 +112,12 @@ forkFinally finalizer computation =
         -- Unregister from the global state,
         -- thus informing the master of this thread's death:
         takeMVar registrationGate
-        atomically $ Multimap.delete slaveThread masterThread slaves
-    atomically $ Multimap.insert slaveThread masterThread slaves
+        atomically $ do
+          Multimap.delete slaveThread masterThread slaves
+          Map.delete masterThread masters
+    atomically $ do
+      Multimap.insert slaveThread masterThread slaves
+      Map.insert masterThread slaveThread masters
     putMVar registrationGate ()
     return slaveThread
 
@@ -120,7 +133,28 @@ waitForSlavesToDie thread =
     unless null retry
 
 -- |
--- A more efficient version of 'forkIO', 
+-- Link the current thread to the given master thread. After this operation,
+-- it's as if the given 'ThreadId' 'fork'ed the current thread, even if the
+-- current thread originally had a different master.
+--
+-- This function can be used to dynamically reconfigure the thread hierarchy,
+-- but its primary use is for interop with other threded libraries that were not
+-- designed with @slave-thread@ in mind.
+link :: ThreadId -> IO ()
+link newMasterThread = do
+  slaveThread <- myThreadId
+  unless (newMasterThread == slaveThread) $
+    atomically $ do
+      Map.focus (Focus.lookup <* Focus.insert newMasterThread) slaveThread masters >>= \case
+        Nothing -> Multimap.insert slaveThread newMasterThread slaves
+        Just oldMasterThread
+          | newMasterThread == oldMasterThread -> return ()
+          | otherwise -> do
+              Multimap.delete slaveThread oldMasterThread slaves
+              Multimap.insert slaveThread newMasterThread slaves
+
+-- |
+-- A more efficient version of 'forkIO',
 -- which does not install a default exception handler on the forked thread.
 {-# INLINE forkIOWithoutHandler #-}
 forkIOWithoutHandler :: IO () -> IO ThreadId
