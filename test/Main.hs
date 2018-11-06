@@ -26,7 +26,7 @@ main =
             atomically $ writeTVar finalizer2CalledVar True
             throwIO (userError "finalizer2 failed")
         in do
-          result :: Either SomeException () <- try $ do
+          result <- try @SomeException $ do
             S.forkFinally finalizer1 $ do
               S.forkFinally finalizer2 $ threadDelay 100
             threadDelay (10^4)
