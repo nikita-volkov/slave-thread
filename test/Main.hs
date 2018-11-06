@@ -116,20 +116,15 @@ main =
         ready <- newEmptyMVar
         var <- newEmptyTMVarIO
         thread <-
-          S.forkFinally (atomically (tryPutTMVar var Master)) $ do
-            S.forkFinally (atomically (tryPutTMVar var Slave)) $
+          S.forkFinally (atomically (tryPutTMVar var 1)) $ do
+            S.forkFinally (atomically (tryPutTMVar var 0)) $
               threadDelay $ 10^6
             putMVar ready ()
             threadDelay $ 10^6
         takeMVar ready
         killThread thread
-        assertEqual "" Slave =<< atomically (readTMVar var)
+        assertEqual "First finalizer is not slave" 0 =<< atomically (readTMVar var)
   ]
-
-data ThreadType
-  = Master
-  | Slave
-  deriving (Eq, Show)
 
 forkWait :: IO a -> IO (IO ())
 forkWait io =
