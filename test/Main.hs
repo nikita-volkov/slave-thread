@@ -58,7 +58,7 @@ main =
       replicateM_ 100000 $ do
         var <- newMVar 0
         semaphore <- SSem.new 0
-        thread <- 
+        thread <-
           S.forkFinally (SSem.signal semaphore) $ do
             join $ forkWait $ do
               join $ forkWait $ do
@@ -109,6 +109,11 @@ main =
             threadDelay $ 10^6
           threadDelay $ 10^6
         assertBool "" (isLeft result)
+    ,
+    testCase "Forked threads don't inherit the masking state" $ do
+      var <- newEmptyMVar
+      mask_ (S.fork (getMaskingState >>= putMVar var))
+      assertEqual "" Unmasked =<< takeMVar var
   ]
 
 forkWait :: IO a -> IO (IO ())
