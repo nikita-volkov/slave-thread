@@ -1,7 +1,6 @@
 module Main where
 
 import Prelude
-import Control.Concurrent.STM
 import Test.QuickCheck.Instances
 import Test.Tasty
 import Test.Tasty.Runners
