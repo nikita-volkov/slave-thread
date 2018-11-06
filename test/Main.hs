@@ -131,7 +131,7 @@ forkWait io =
   do
     v <- newEmptyMVar
     S.fork $ do
-      r <- try io
+      r <- try @SomeException io
       putMVar v ()
-      either (throwIO @SomeException) return r
+      either throwIO return r
     return $ takeMVar v
