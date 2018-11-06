@@ -25,11 +25,10 @@ main =
           do
             atomically $ writeTVar finalizer2CalledVar True
             throwIO (userError "finalizer2 failed")
-        in do
-          try @SomeException $ do
-            S.forkFinally finalizer1 $ do
-              S.forkFinally finalizer2 $ threadDelay 100
-      threadDelay (10^4)
+        in try @SomeException $ do
+          S.forkFinally finalizer1 $ do
+            S.forkFinally finalizer2 $ threadDelay 100
+          threadDelay (10^4)
       assertEqual "" "Left user error (finalizer2 failed)" (show result)
       finalizer2Called <- atomically (readTVar finalizer2CalledVar)
       finalizer1Called <- atomically (readTVar finalizer1CalledVar)
