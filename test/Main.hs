@@ -1,7 +1,6 @@
 module Main where
 
 import Prelude
-import Control.Concurrent.STM
 import Test.QuickCheck.Instances
 import Test.Tasty
 import Test.Tasty.Runners
@@ -124,6 +123,11 @@ main =
         takeMVar ready
         killThread thread
         assertEqual "First finalizer is not slave" 0 =<< atomically (readTMVar var)
+    ,
+    testCase "Forked threads don't inherit the masking state" $ do
+      var <- newEmptyMVar
+      mask_ (S.fork (getMaskingState >>= putMVar var))
+      assertEqual "" Unmasked =<< takeMVar var
   ]
 
 forkWait :: IO a -> IO (IO ())
