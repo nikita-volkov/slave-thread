@@ -51,7 +51,6 @@ import GHC.Exts (Int(I#), fork#, forkOn#)
 import GHC.IO (IO(IO), unsafeUnmask)
 import System.IO.Unsafe
 import qualified DeferredFolds.UnfoldlM as UnfoldlM
-import qualified PartialHandler
 import qualified StmContainers.Multimap as Multimap
 import qualified Control.Foldl as Foldl
 
@@ -85,26 +84,31 @@ forkFinally finalizer computation =
     masterThread <- myThreadId
     -- Ensures that the thread gets registered before being unregistered
     registrationGate <- newEmptyMVar
-    slaveThread <-
-      forkIOWithUnmaskWithoutHandler $ \unmask -> do
-        slaveThread <- myThreadId
-        catch
-          (unmask (void computation))
-          (PartialHandler.totalizeRethrowingTo_ masterThread
-            (PartialHandler.onThreadKilled (return ())))
-        -- Context management:
-        catch
-          (do
-            killSlaves slaveThread
-            waitForSlavesToDie slaveThread)
-          (PartialHandler.totalizeRethrowingTo_ masterThread mempty)
-        -- Finalization:
-        catch (void finalizer) $
-          PartialHandler.totalizeRethrowingTo_ masterThread $ mempty
-        -- Unregister from the global state,
-        -- thus informing the master of this thread's death:
-        takeMVar registrationGate
-        atomically $ Multimap.delete slaveThread masterThread slaves
+    slaveThread <- forkIOWithUnmaskWithoutHandler $ \ unmask -> do
+
+      slaveThread <- myThreadId
+
+      -- Execute the main computation:
+      catch (unmask (void computation)) $ \ e ->
+        case fromException e of
+          Just ThreadKilled -> return ()
+          Nothing -> throwTo masterThread e
+
+      -- Kill the slaves and wait for them to die:
+      catch @SomeException
+        (do
+          killSlaves slaveThread
+          waitForSlavesToDie slaveThread)
+        (throwTo masterThread)
+
+      -- Finalize:
+      catch @SomeException (void finalizer) (throwTo masterThread)
+
+      -- Unregister from the global state,
+      -- thus informing the master of this thread's death:
+      takeMVar registrationGate
+      atomically $ Multimap.delete slaveThread masterThread slaves
+
     atomically $ Multimap.insert slaveThread masterThread slaves
     putMVar registrationGate ()
     return slaveThread
