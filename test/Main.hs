@@ -29,11 +29,11 @@ main =
           S.forkFinally finalizer1 $ do
             S.forkFinally finalizer2 $ threadDelay 100
           threadDelay (10^4)
-      assertEqual "" "Left user error (finalizer2 failed)" (show result)
       finalizer2Called <- atomically (readTVar finalizer2CalledVar)
       finalizer1Called <- atomically (readTVar finalizer1CalledVar)
-      assertEqual "" True finalizer2Called
-      assertEqual "" True finalizer1Called
+      assertEqual "finalizer2 not called" True finalizer2Called
+      assertEqual "finalizer1 not called" True finalizer1Called
+      assertEqual "Invalid result" "Left user error (finalizer2 failed)" (show result)
     ,
     testCase "Forked threads run fine" $ do
       replicateM_ 100000 $ do
