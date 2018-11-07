@@ -128,6 +128,19 @@ main =
       var <- newEmptyMVar
       mask_ (S.fork (getMaskingState >>= putMVar var))
       assertEqual "" Unmasked =<< takeMVar var
+    ,
+    testCase "Slave thread finalizer is not interrupted by its own death (#11)" $ do
+      ref <- newIORef True
+      done <- newEmptyMVar
+      S.forkFinally (putMVar done ()) $ do
+        ready <- newEmptyMVar
+        S.forkFinally (catch @SomeException (threadDelay (10^6)) (\_ -> writeIORef ref False)) $ do
+          takeMVar ready
+          throwIO (userError "")
+        catch @SomeException
+          (putMVar ready () >> threadDelay (10^6)) (\_ -> return ())
+      takeMVar done
+      assertBool "Slave thread finalizer interrupted" =<< readIORef ref
   ]
 
 forkWait :: IO a -> IO (IO ())
