@@ -92,7 +92,7 @@ forkFinally finalizer computation =
       catch (unmask (void computation)) $ \ e ->
         case fromException e of
           Just ThreadKilled -> return ()
-          Nothing -> throwTo masterThread e
+          _ -> throwTo masterThread e
 
       -- Kill the slaves and wait for them to die:
       catch @SomeException
