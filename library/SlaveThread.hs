@@ -80,7 +80,7 @@ fork =
 {-# INLINABLE forkFinally #-}
 forkFinally :: IO a -> IO b -> IO ThreadId
 forkFinally finalizer computation =
-  mask_ $ do
+  uninterruptibleMask_ $ do
     masterThread <- myThreadId
     -- Ensures that the thread gets registered before being unregistered
     registrationGate <- newEmptyMVar
@@ -94,20 +94,27 @@ forkFinally finalizer computation =
           Just ThreadKilled -> return ()
           _ -> throwTo masterThread e
 
-      -- Kill the slaves and wait for them to die:
-      catch @SomeException
-        (do
+      -- Kill the slaves and wait for them to die:      
+      catch
+        (unmask $ do
           killSlaves slaveThread
           waitForSlavesToDie slaveThread)
-        (throwTo masterThread)
+        (\ e -> case fromException e of
+          Just ThreadKilled -> return ()
+          _ -> throwTo masterThread e)
 
       -- Finalize:
-      catch @SomeException (void finalizer) (throwTo masterThread)
+      finalizerResult <- try @SomeException (void finalizer)
 
       -- Unregister from the global state,
       -- thus informing the master of this thread's death:
       takeMVar registrationGate
       atomically $ Multimap.delete slaveThread masterThread slaves
+
+      -- 
+      case finalizerResult of
+        Left e -> throwTo masterThread e
+        _ -> return ()
 
     atomically $ Multimap.insert slaveThread masterThread slaves
     putMVar registrationGate ()
