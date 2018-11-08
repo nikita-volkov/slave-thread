@@ -39,6 +39,7 @@ module SlaveThread
 where
 
 import SlaveThread.Prelude
+import SlaveThread.Util.IO
 import qualified DeferredFolds.UnfoldlM as UnfoldlM
 import qualified StmContainers.Multimap as Multimap
 import qualified Control.Foldl as Foldl
@@ -119,11 +120,3 @@ waitForSlavesToDie thread =
   atomically $ do
     null <- UnfoldlM.null $ Multimap.unfoldMByKey thread slaves
     unless null retry
-
--- |
--- A more efficient version of 'forkIOWithUnmask',
--- which does not install a default exception handler on the forked thread.
-{-# INLINE forkIOWithUnmaskWithoutHandler #-}
-forkIOWithUnmaskWithoutHandler :: ((forall a. IO a -> IO a) -> IO ()) -> IO ThreadId
-forkIOWithUnmaskWithoutHandler action =
-  IO $ \s -> case (fork# (action unsafeUnmask)  s) of (# s', tid #) -> (# s', ThreadId tid #)
