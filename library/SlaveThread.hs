@@ -79,32 +79,43 @@ forkFinally finalizer computation =
       slaveThread <- myThreadId
 
       -- Execute the main computation:
-      catch (unmask (void computation)) $ \ e ->
-        case fromException e of
-          Just ThreadKilled -> return ()
-          _ -> throwTo masterThread e
+      computationExceptionIfAny <- catch (unmask computation $> Nothing) (return . Just)
 
       -- Kill the slaves and wait for them to die:      
-      catch
-        (unmask $ do
-          killSlaves slaveThread
-          waitForSlavesToDie slaveThread)
-        (\ e -> case fromException e of
-          Just ThreadKilled -> return ()
-          _ -> throwTo masterThread e)
+      killSlaves slaveThread
+      slavesDyingExceptions <- let
+        loop !exceptions =
+          catch
+            (unmask (waitForSlavesToDie slaveThread) $> exceptions)
+            (\ !exception -> loop (exception : exceptions))
+          in loop []
 
       -- Finalize:
-      finalizerResult <- try @SomeException (void finalizer)
+      finalizerExceptionIfAny <- catch (finalizer $> Nothing) (return . Just)
 
       -- Unregister from the global state,
       -- thus informing the master of this thread's death:
       takeMVar registrationGate
       atomically $ Multimap.delete slaveThread masterThread slaves
 
-      -- 
-      case finalizerResult of
-        Left e -> throwTo masterThread e
-        _ -> return ()
+      -- Process the exceptions:
+      let
+        handler e = case fromException e of
+          Just ThreadKilled -> return ()
+          _ -> throwTo masterThread e
+        in do
+          forM_ computationExceptionIfAny handler
+          forM_ slavesDyingExceptions handler
+          forM_ finalizerExceptionIfAny handler
+
+      -- -- In computation:
+      -- forM_ computationExceptionIfAny $ \ e -> case fromException e of
+      --   ThreadKilled -> return ()
+      --   _ -> throwTo masterThread e
+      -- -- In waiting for slaves to die:
+      -- forM_ slavesDyingExceptions (throwTo masterThread)
+      -- -- In finalization:
+      -- forM_ finalizerExceptionIfAny $ \ e -> throwTo
 
     atomically $ Multimap.insert slaveThread masterThread slaves
     putMVar registrationGate ()
