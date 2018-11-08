@@ -38,17 +38,7 @@ module SlaveThread
 )
 where
 
-import Prelude
-import Data.Foldable
-import Data.Traversable
-import Control.Applicative
-import Control.Concurrent hiding (forkFinally)
-import Control.Exception
-import Control.Monad
-import GHC.Conc
-import GHC.Exts (Int(I#), fork#, forkOn#)
-import GHC.IO (IO(IO), unsafeUnmask)
-import System.IO.Unsafe
+import SlaveThread.Prelude
 import qualified DeferredFolds.UnfoldlM as UnfoldlM
 import qualified StmContainers.Multimap as Multimap
 import qualified Control.Foldl as Foldl
