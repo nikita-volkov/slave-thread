@@ -143,22 +143,20 @@ main =
       assertBool "Slave thread finalizer interrupted" =<< readIORef ref
     ,
     testCase "Master kills all slaves, even if it is thrown an exception during (#13)" $ do
-      survived <- newEmptyMVar
+      survived <- newEmptyTMVarIO
       ready <- newEmptyMVar
       done <- newEmptyMVar
       thread <-
         S.fork $ do
-          S.fork $ do
+          S.forkFinally (atomically (tryPutTMVar survived True)) $ do
             uninterruptibleMask_ (putMVar ready () >> threadDelay (10^6))
-            putMVar survived ()
+            atomically (putTMVar survived False)
           takeMVar ready
           putMVar done ()
       takeMVar done
       threadDelay $ 10^5 -- be reasonably sure it's trying to kill its child
       killThread thread
-      try (takeMVar survived) >>= \case
-        Left BlockedIndefinitelyOnMVar -> return ()
-        Right () -> assertBool "Slave thread not killed by master" False
+      assertBool "Slave thread not killed by master" =<< atomically (takeTMVar survived)
   ]
 
 forkWait :: IO a -> IO (IO ())
