@@ -1,4 +1,4 @@
-module SlaveThread.Util.IO where
+module SlaveThread.Util.LowLevelForking where
 
 import SlaveThread.Prelude
 

@@ -39,7 +39,7 @@ module SlaveThread
 where
 
 import SlaveThread.Prelude
-import SlaveThread.Util.IO
+import SlaveThread.Util.LowLevelForking
 import qualified DeferredFolds.UnfoldlM as UnfoldlM
 import qualified StmContainers.Multimap as Multimap
 import qualified Control.Foldl as Foldl

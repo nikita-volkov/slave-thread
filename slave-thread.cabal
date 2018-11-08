@@ -56,7 +56,7 @@ library
   exposed-modules: SlaveThread
   other-modules:
     SlaveThread.Prelude
-    SlaveThread.Util.IO
+    SlaveThread.Util.LowLevelForking
   build-depends:
     base >=4.9 && <5,
     deferred-folds >=0.9 && <0.10,
