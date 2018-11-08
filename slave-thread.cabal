@@ -58,8 +58,7 @@ library
     base >=4.9 && <5,
     deferred-folds >=0.9 && <0.10,
     foldl >=1 && <2,
-    stm-containers >=1.1 && <1.2,
-    transformers >=0.5 && <0.6
+    stm-containers >=1.1 && <1.2
 
 test-suite test
   type: exitcode-stdio-1.0

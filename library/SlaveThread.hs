@@ -45,7 +45,6 @@ import Control.Applicative
 import Control.Concurrent hiding (forkFinally)
 import Control.Exception
 import Control.Monad
-import Control.Monad.Trans.Reader
 import GHC.Conc
 import GHC.Exts (Int(I#), fork#, forkOn#)
 import GHC.IO (IO(IO), unsafeUnmask)
