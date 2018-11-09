@@ -83,48 +83,49 @@ forkFinally finalizer computation =
       log ("Forking from " <> show masterThread)
 
       -- Execute the main computation:
-      computationExceptionIfAny <- catch (unmask computation $> Nothing) (return . Just)
+      computationExceptions <- catch (unmask computation $> empty) (return . pure)
 
       -- Kill the slaves and wait for them to die:      
-      killSlaves slaveThread
+      log "Killing the slaves"
       slavesDyingExceptions <- let
         loop !exceptions =
           catch
-            (unmask (waitForSlavesToDie slaveThread) $> exceptions)
+            (unmask $ do
+              killSlaves slaveThread
+              waitForSlavesToDie slaveThread
+              return exceptions)
             (\ !exception -> loop (exception : exceptions))
           in loop []
 
-      log (show slavesDyingExceptions)
-
-      log "Finalizing"
       -- Finalize:
-      finalizerExceptionIfAny <- catch (finalizer $> Nothing) (return . Just)
+      log "Finalizing"
+      finalizerExceptions <- catch (finalizer $> empty) (return . pure)
 
-      log "Waiting at registration gate"
+      -- Rethrow the exceptions:
+      let
+        handler e = do
+          log ("Rethrowing: " <> show e)
+          case fromException e of
+            Just ThreadKilled -> return ()
+            _ -> throwTo masterThread e
+        in do
+          forM_ @Maybe computationExceptions handler
+          forM_ slavesDyingExceptions handler
+          forM_ @Maybe finalizerExceptions handler
+
       -- Unregister from the global state,
       -- thus informing the master of this thread's death:
+      log "Waiting at registration gate"
       takeMVar registrationGate
+
       log "Deleting itself from the registry"
       atomically $ Multimap.delete slaveThread masterThread slaveRegistry
 
-      log "Processing the exceptions"
-      -- Process the exceptions:
-      let
-        handler e = case fromException e of
-          Just ThreadKilled -> return ()
-          _ -> throwTo masterThread e
-        in do
-          log "Processing the computation exception"
-          forM_ computationExceptionIfAny handler
-          log "Processing the slaves dying exceptions"
-          forM_ slavesDyingExceptions handler
-          log "Processing the finalizer exceptions"
-          forM_ finalizerExceptionIfAny handler
-
-      log "Finishing"
+      log "Terminating"
 
     atomically $ Multimap.insert slaveThread masterThread slaveRegistry
     putMVar registrationGate ()
+    
     return slaveThread
 
 killSlaves :: ThreadId -> IO ()
