@@ -130,15 +130,65 @@ main =
       assertEqual "" Unmasked =<< takeMVar var
     ,
     testCase "Slave thread finalizer is not interrupted by its own death (#11)" $ do
+      -- Set up the ref that should be written to by thread 2's finalizer,
+      -- otherwise there's a bug.
       ref <- newIORef True
+
+      -- Let the main thread know when it should check the above IORef.
       done <- newEmptyMVar
+
+      -- The gist of the test below: assert that, when a thread fails (here, the
+      -- inner thread), its finalizer is not interrupted by a ThreadKilled
+      -- thrown by the parent, which was originally triggered by its own death.
+
       S.forkFinally (putMVar done ()) $ do
+
+        -- Let thread 2 know when it should die, with thread 1's exception
+        -- handler in place.
         ready <- newEmptyMVar
-        S.forkFinally (catch @SomeException (threadDelay (10^6)) (\_ -> writeIORef ref False)) $ do
+
+        S.forkFinally
+          -- The finalizer: first, sleep for 1s.
+          --
+          -- This sleep was originally just to provide a window of time for the
+          -- parent's ThreadKilled to hit us, allowing us to write 'False' to
+          -- the IORef, demonstrating the bug.
+          --
+          -- However, the current version of the code (to my eyes) *obviously*
+          -- would not trigger this behavior, as a child deletes itself from
+          -- the thread map before notifying its parent. I'd expect this test
+          -- to just sleep needlessly for a second, then succeed.
+          --
+          -- But here's the new bug! The *parent* is only sleeping for 1s as
+          -- well, waiting for us to die. Before, we'd propagate our exception
+          -- right away, but now, we do it after finalizing.
+          --
+          -- So by the time we've finished our finalizer and go to send the
+          -- 'userError ""' to the parent, *it* has cleanly exited its body and
+          -- is in the process of killing its children (us) with asynchronous
+          -- exceptions masked.
+          --
+          -- At this point both the parent and child are throwing exceptions
+          -- to each other in the MaskedUninterruptible state (deadlock).
+          (catch @SomeException (threadDelay (10^6)) (\_ -> writeIORef ref False)) $ do
+
+          -- Wait until thread 1 is ready for us to die.
           takeMVar ready
+
+          -- Die.
           throwIO (userError "")
+
         catch @SomeException
-          (putMVar ready () >> threadDelay (10^6)) (\_ -> return ())
+          ( -- Tell thread 2 we're ready for it to die
+            putMVar ready () >>
+
+            -- Sleep until thread 2 kills us.
+            threadDelay (10^6)
+          )
+          -- Ignore thread 2's exception, so we don't propagate it up to the
+          -- main thread.
+          (\_ -> return ())
+
       takeMVar done
       assertBool "Slave thread finalizer interrupted" =<< readIORef ref
     ,
