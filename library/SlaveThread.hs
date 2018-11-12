@@ -47,9 +47,9 @@ import qualified Control.Foldl as Foldl
 
 -- |
 -- A global registry of all slave threads by their masters.
-{-# NOINLINE slaves #-}
-slaves :: Multimap.Multimap ThreadId ThreadId
-slaves =
+{-# NOINLINE slaveRegistry #-}
+slaveRegistry :: Multimap.Multimap ThreadId ThreadId
+slaveRegistry =
   unsafePerformIO Multimap.newIO
 
 -- |
@@ -105,7 +105,7 @@ forkFinally finalizer computation =
       -- thus informing the master of this thread's death:
       takeMVar registrationGate
       log "Deleting itself from the registry"
-      atomically $ Multimap.delete slaveThread masterThread slaves
+      atomically $ Multimap.delete slaveThread masterThread slaveRegistry
 
       log "Processing the exceptions"
       -- Process the exceptions:
@@ -123,17 +123,17 @@ forkFinally finalizer computation =
 
       log "Finishing"
 
-    atomically $ Multimap.insert slaveThread masterThread slaves
+    atomically $ Multimap.insert slaveThread masterThread slaveRegistry
     putMVar registrationGate ()
     return slaveThread
 
 killSlaves :: ThreadId -> IO ()
 killSlaves thread = do
-  threads <- atomically (UnfoldlM.foldM (Foldl.generalize Foldl.revList) (Multimap.unfoldMByKey thread slaves))
+  threads <- atomically (UnfoldlM.foldM (Foldl.generalize Foldl.revList) (Multimap.unfoldMByKey thread slaveRegistry))
   traverse_ killThread threads
 
 waitForSlavesToDie :: ThreadId -> IO ()
 waitForSlavesToDie thread =
   atomically $ do
-    null <- UnfoldlM.null $ Multimap.unfoldMByKey thread slaves
+    null <- UnfoldlM.null $ Multimap.unfoldMByKey thread slaveRegistry
     unless null retry
