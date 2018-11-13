@@ -148,29 +148,7 @@ main =
         ready <- newEmptyMVar
 
         S.forkFinally
-          -- The finalizer: first, sleep for 1s.
-          --
-          -- This sleep was originally just to provide a window of time for the
-          -- parent's ThreadKilled to hit us, allowing us to write 'False' to
-          -- the IORef, demonstrating the bug.
-          --
-          -- However, the current version of the code (to my eyes) *obviously*
-          -- would not trigger this behavior, as a child deletes itself from
-          -- the thread map before notifying its parent. I'd expect this test
-          -- to just sleep needlessly for a second, then succeed.
-          --
-          -- But here's the new bug! The *parent* is only sleeping for 1s as
-          -- well, waiting for us to die. Before, we'd propagate our exception
-          -- right away, but now, we do it after finalizing.
-          --
-          -- So by the time we've finished our finalizer and go to send the
-          -- 'userError ""' to the parent, *it* has cleanly exited its body and
-          -- is in the process of killing its children (us) with asynchronous
-          -- exceptions masked.
-          --
-          -- At this point both the parent and child are throwing exceptions
-          -- to each other in the MaskedUninterruptible state (deadlock).
-          (catch @SomeException (threadDelay (10^6)) (\_ -> writeIORef ref False)) $ do
+          (catch @SomeException (threadDelay (10^5)) (\_ -> writeIORef ref False)) $ do
 
           -- Wait until thread 1 is ready for us to die.
           takeMVar ready
@@ -183,11 +161,11 @@ main =
             putMVar ready () >>
 
             -- Sleep until thread 2 kills us.
-            threadDelay (10^6)
+            threadDelay (10^5*2)
           )
           -- Ignore thread 2's exception, so we don't propagate it up to the
           -- main thread.
-          (\_ -> return ())
+          (\ _ -> return ())
 
       takeMVar done
       assertBool "Slave thread finalizer interrupted" =<< readIORef ref
