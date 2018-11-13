@@ -130,15 +130,43 @@ main =
       assertEqual "" Unmasked =<< takeMVar var
     ,
     testCase "Slave thread finalizer is not interrupted by its own death (#11)" $ do
+      -- Set up the ref that should be written to by thread 2's finalizer,
+      -- otherwise there's a bug.
       ref <- newIORef True
+
+      -- Let the main thread know when it should check the above IORef.
       done <- newEmptyMVar
+
+      -- The gist of the test below: assert that, when a thread fails (here, the
+      -- inner thread), its finalizer is not interrupted by a ThreadKilled
+      -- thrown by the parent, which was originally triggered by its own death.
+
       S.forkFinally (putMVar done ()) $ do
+
+        -- Let thread 2 know when it should die, with thread 1's exception
+        -- handler in place.
         ready <- newEmptyMVar
-        S.forkFinally (catch @SomeException (threadDelay (10^6)) (\_ -> writeIORef ref False)) $ do
+
+        S.forkFinally
+          (catch @SomeException (threadDelay (10^5)) (\_ -> writeIORef ref False)) $ do
+
+          -- Wait until thread 1 is ready for us to die.
           takeMVar ready
+
+          -- Die.
           throwIO (userError "")
+
         catch @SomeException
-          (putMVar ready () >> threadDelay (10^6)) (\_ -> return ())
+          ( -- Tell thread 2 we're ready for it to die
+            putMVar ready () >>
+
+            -- Sleep until thread 2 kills us.
+            threadDelay (10^5*2)
+          )
+          -- Ignore thread 2's exception, so we don't propagate it up to the
+          -- main thread.
+          (\ _ -> return ())
+
       takeMVar done
       assertBool "Slave thread finalizer interrupted" =<< readIORef ref
     ,

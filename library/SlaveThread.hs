@@ -47,9 +47,9 @@ import qualified Control.Foldl as Foldl
 
 -- |
 -- A global registry of all slave threads by their masters.
-{-# NOINLINE slaves #-}
-slaves :: Multimap.Multimap ThreadId ThreadId
-slaves =
+{-# NOINLINE slaveRegistry #-}
+slaveRegistry :: Multimap.Multimap ThreadId ThreadId
+slaveRegistry =
   unsafePerformIO Multimap.newIO
 
 -- |
@@ -79,44 +79,50 @@ forkFinally finalizer computation =
       slaveThread <- myThreadId
 
       -- Execute the main computation:
-      catch (unmask (void computation)) $ \ e ->
-        case fromException e of
-          Just ThreadKilled -> return ()
-          _ -> throwTo masterThread e
+      computationExceptions <- catch (unmask computation $> empty) (return . pure)
 
       -- Kill the slaves and wait for them to die:      
-      catch
-        (unmask $ do
-          killSlaves slaveThread
-          waitForSlavesToDie slaveThread)
-        (\ e -> case fromException e of
-          Just ThreadKilled -> return ()
-          _ -> throwTo masterThread e)
+      slavesDyingExceptions <- let
+        loop !exceptions =
+          catch
+            (unmask $ do
+              killSlaves slaveThread
+              waitForSlavesToDie slaveThread
+              return exceptions)
+            (\ !exception -> loop (exception : exceptions))
+          in loop []
 
       -- Finalize:
-      finalizerResult <- try @SomeException (void finalizer)
+      finalizerExceptions <- catch (finalizer $> empty) (return . pure)
+
+      -- Rethrow the exceptions:
+      let
+        handler e = do
+          case fromException e of
+            Just ThreadKilled -> return ()
+            _ -> throwTo masterThread e
+        in do
+          forM_ @Maybe computationExceptions handler
+          forM_ slavesDyingExceptions handler
+          forM_ @Maybe finalizerExceptions handler
 
       -- Unregister from the global state,
       -- thus informing the master of this thread's death:
       takeMVar registrationGate
-      atomically $ Multimap.delete slaveThread masterThread slaves
+      atomically $ Multimap.delete slaveThread masterThread slaveRegistry
 
-      -- 
-      case finalizerResult of
-        Left e -> throwTo masterThread e
-        _ -> return ()
-
-    atomically $ Multimap.insert slaveThread masterThread slaves
+    atomically $ Multimap.insert slaveThread masterThread slaveRegistry
     putMVar registrationGate ()
+    
     return slaveThread
 
 killSlaves :: ThreadId -> IO ()
 killSlaves thread = do
-  threads <- atomically (UnfoldlM.foldM (Foldl.generalize Foldl.revList) (Multimap.unfoldMByKey thread slaves))
+  threads <- atomically (UnfoldlM.foldM (Foldl.generalize Foldl.revList) (Multimap.unfoldMByKey thread slaveRegistry))
   traverse_ killThread threads
 
 waitForSlavesToDie :: ThreadId -> IO ()
 waitForSlavesToDie thread =
   atomically $ do
-    null <- UnfoldlM.null $ Multimap.unfoldMByKey thread slaves
+    null <- UnfoldlM.null $ Multimap.unfoldMByKey thread slaveRegistry
     unless null retry
