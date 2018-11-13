@@ -34,7 +34,11 @@
 module SlaveThread
 (
   fork,
+  forkWithUnmask,
   forkFinally,
+  forkFinallyWithUnmask,
+  -- * Notes
+  -- $note-unmask
 )
 where
 
@@ -61,6 +65,14 @@ fork =
   forkFinally $ return ()
 
 -- |
+-- Like 'fork', but provides the computation a function that unmasks
+-- asynchronous exceptions. See @Note [Unmask]@ at the bottom of this module.
+{-# INLINABLE forkWithUnmask #-}
+forkWithUnmask :: ((forall x. IO x -> IO x) -> IO a) -> IO ThreadId
+forkWithUnmask =
+  forkFinallyWithUnmask $ return ()
+
+-- |
 -- Fork a slave thread with a finalizer action to run a computation on.
 -- The finalizer gets executed when the thread dies for whatever reason:
 -- due to being killed or an uncaught exception, or a normal termination.
@@ -71,18 +83,26 @@ fork =
 {-# INLINABLE forkFinally #-}
 forkFinally :: IO a -> IO b -> IO ThreadId
 forkFinally finalizer computation =
-  uninterruptibleMask_ $ do
+  forkFinallyWithUnmask finalizer (\unmask -> unmask computation)
+
+-- |
+-- Like 'forkFinally', but provides the computation a function that unmasks
+-- asynchronous exceptions. See @Note [Unmask]@ at the bottom of this module.
+{-# INLINABLE forkFinallyWithUnmask #-}
+forkFinallyWithUnmask :: IO a -> ((forall x. IO x -> IO x) -> IO b) -> IO ThreadId
+forkFinallyWithUnmask finalizer computation =
+  uninterruptibleMask $ \unmask -> do
 
     masterThread <- myThreadId
 
-    slaveThread <- forkIOWithUnmaskWithoutHandler $ \ unmask -> do
+    slaveThread <- forkIOWithoutHandler $ do
 
       slaveThread <- myThreadId
 
       -- Execute the main computation:
-      computationExceptions <- catch (unmask computation $> empty) (return . pure)
+      computationExceptions <- catch (computation unmask $> empty) (return . pure)
 
-      -- Kill the slaves and wait for them to die:      
+      -- Kill the slaves and wait for them to die:
       slavesDyingExceptions <- let
         loop !exceptions =
           catch
@@ -117,7 +137,7 @@ forkFinally finalizer computation =
           _ -> retry
 
     atomically $ Multimap.insert slaveThread masterThread slaveRegistry
-    
+
     return slaveThread
 
 killSlaves :: ThreadId -> IO ()
@@ -130,3 +150,49 @@ waitForSlavesToDie thread =
   atomically $ do
     null <- UnfoldlM.null $ Multimap.unfoldMByKey thread slaveRegistry
     unless null retry
+
+-- $note-unmask
+--
+-- == @Note [Unmask]@
+--
+-- Threads forked by this library, unlike @base@, /already/ mask asynchronous
+-- exceptions internally, for bookkeeping purposes.
+--
+-- The @*withUnmask@ variants of 'fork' are thus different from the
+-- @*withUnmask@ variants found in @base@ and @async@, in that the unmasking
+-- function they provide restores the masking state /to that of the calling context/,
+-- as opposed to /unmasked/.
+--
+-- Put another way, @base@ code that you may have written as:
+--
+-- @
+-- mask (\\unmask -> forkIO (initialize >> unmask computation))
+-- @
+--
+-- would be instead be written using this library as:
+--
+-- @
+-- 'forkWithUnmask' (\\unmask -> initialize >> unmask computation)
+-- @
+--
+-- And @base@ code that you may have written as:
+--
+-- @
+-- mask_ (forkIOWithUnmask (\\unmask -> initialize >> unmask computation))
+-- @
+--
+-- will instead have to /manually/ call the low-level unmasking function called
+-- 'GHC.IO.unsafeUnmask', as:
+--
+-- @
+-- mask_ ('forkWithUnmask' (\\_ -> initialize >> unsafeUnmask computation))
+-- @
+--
+-- Note that we used 'forkWithUnmask' (to guarantee @initialize@ is run with
+-- asynchronous exceptions masked), but the unmasking function it provided does
+-- not guarantee asynchronous exceptions are actually unmasked, so we toss it
+-- and use 'GHC.IO.unsafeUnmask' instead.
+--
+-- This idiom is uncommon, but necessary when you need to fork a thread in
+-- library code that is unsure if it's being called with asynchronous exceptions
+-- masked (as in the "acquire" phase of a @bracket@ call).
