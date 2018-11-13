@@ -78,15 +78,10 @@ forkFinally finalizer computation =
 
       slaveThread <- myThreadId
 
-      let log message = traceM (show slaveThread <> ": " <> message)
-
-      log ("Forking from " <> show masterThread)
-
       -- Execute the main computation:
       computationExceptions <- catch (unmask computation $> empty) (return . pure)
 
       -- Kill the slaves and wait for them to die:      
-      log "Killing the slaves"
       slavesDyingExceptions <- let
         loop !exceptions =
           catch
@@ -98,13 +93,11 @@ forkFinally finalizer computation =
           in loop []
 
       -- Finalize:
-      log "Finalizing"
       finalizerExceptions <- catch (finalizer $> empty) (return . pure)
 
       -- Rethrow the exceptions:
       let
         handler e = do
-          log ("Rethrowing: " <> show e)
           case fromException e of
             Just ThreadKilled -> return ()
             _ -> throwTo masterThread e
@@ -115,13 +108,8 @@ forkFinally finalizer computation =
 
       -- Unregister from the global state,
       -- thus informing the master of this thread's death:
-      log "Waiting at registration gate"
       takeMVar registrationGate
-
-      log "Deleting itself from the registry"
       atomically $ Multimap.delete slaveThread masterThread slaveRegistry
-
-      log "Terminating"
 
     atomically $ Multimap.insert slaveThread masterThread slaveRegistry
     putMVar registrationGate ()
