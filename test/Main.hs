@@ -124,11 +124,6 @@ main =
         killThread thread
         assertEqual "First finalizer is not slave" 0 =<< atomically (readTMVar var)
     ,
-    testCase "Forked threads don't inherit the masking state" $ do
-      var <- newEmptyMVar
-      mask_ (S.fork (getMaskingState >>= putMVar var))
-      assertEqual "" Unmasked =<< takeMVar var
-    ,
     testCase "Slave thread finalizer is not interrupted by its own death (#11)" $ do
       -- Set up the ref that should be written to by thread 2's finalizer,
       -- otherwise there's a bug.
