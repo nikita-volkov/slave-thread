@@ -43,6 +43,7 @@ import SlaveThread.Util.LowLevelForking
 import qualified DeferredFolds.UnfoldlM as UnfoldlM
 import qualified StmContainers.Multimap as Multimap
 import qualified Control.Foldl as Foldl
+import qualified Focus
 
 
 -- |
@@ -71,9 +72,9 @@ fork =
 forkFinally :: IO a -> IO b -> IO ThreadId
 forkFinally finalizer computation =
   uninterruptibleMask_ $ do
+
     masterThread <- myThreadId
-    -- Ensures that the thread gets registered before being unregistered
-    registrationGate <- newEmptyMVar
+
     slaveThread <- forkIOWithUnmaskWithoutHandler $ \ unmask -> do
 
       slaveThread <- myThreadId
@@ -107,12 +108,15 @@ forkFinally finalizer computation =
           forM_ @Maybe finalizerExceptions handler
 
       -- Unregister from the global state,
-      -- thus informing the master of this thread's death:
-      takeMVar registrationGate
-      atomically $ Multimap.delete slaveThread masterThread slaveRegistry
+      -- thus informing the master of this thread's death.
+      -- Whilst doing so, also ensure that the master has already registered this slave.
+      atomically $ do
+        result <- Multimap.focus Focus.lookupAndDelete slaveThread masterThread slaveRegistry
+        case result of
+          Just _ -> return ()
+          _ -> retry
 
     atomically $ Multimap.insert slaveThread masterThread slaveRegistry
-    putMVar registrationGate ()
     
     return slaveThread
 
