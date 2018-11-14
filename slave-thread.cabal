@@ -1,5 +1,5 @@
 name: slave-thread
-version: 1.0.2.7
+version: 1.0.3
 synopsis: A fundamental solution to ghost threads and silent exceptions
 description:
   Vanilla thread management in Haskell is low level and 
