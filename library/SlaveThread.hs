@@ -153,9 +153,9 @@ waitForSlavesToDie thread =
 
 -- $note-unmask
 --
--- == @Note [Unmask]@
+-- == Masking
 --
--- Threads forked by this library, unlike @base@, /already/ mask asynchronous
+-- Threads forked by this library, unlike in @base@, /already/ mask asynchronous
 -- exceptions internally, for bookkeeping purposes.
 --
 -- The @*withUnmask@ variants of 'fork' are thus different from the
@@ -163,19 +163,19 @@ waitForSlavesToDie thread =
 -- function they provide restores the masking state /to that of the calling context/,
 -- as opposed to /unmasked/.
 --
--- Put another way, @base@ code that you may have written as:
+-- Put another way, the @base@ code that you may have written as:
 --
 -- @
 -- mask (\\unmask -> forkIO (initialize >> unmask computation))
 -- @
 --
--- would be instead be written using this library as:
+-- using this library would be instead written as:
 --
 -- @
 -- 'forkWithUnmask' (\\unmask -> initialize >> unmask computation)
 -- @
 --
--- And @base@ code that you may have written as:
+-- And the @base@ code that you may have written as:
 --
 -- @
 -- mask_ (forkIOWithUnmask (\\unmask -> initialize >> unmask computation))
