@@ -37,6 +37,7 @@ module SlaveThread
   forkWithUnmask,
   forkFinally,
   forkFinallyWithUnmask,
+  SlaveThreadCrashed(..)
   -- * Notes
   -- $note-unmask
 )
@@ -121,7 +122,7 @@ forkFinallyWithUnmask finalizer computation =
         handler e = do
           case fromException e of
             Just ThreadKilled -> return ()
-            _ -> throwTo masterThread e
+            _ -> throwTo masterThread (SlaveThreadCrashed slaveThread e)
         in do
           forM_ @Maybe computationExceptions handler
           forM_ slavesDyingExceptions handler
@@ -150,6 +151,37 @@ waitForSlavesToDie thread =
   atomically $ do
     null <- UnfoldlM.null $ Multimap.unfoldMByKey thread slaveRegistry
     unless null retry
+
+-- | A slave thread crashed. This exception is classified as /asynchronous/,
+-- meaning it extends from 'SomeAsyncException'.
+--
+-- In general,
+--
+-- * /Synchronous/ exceptions such as 'IOException' are thrown by IO actions
+--   that are explicitly called by the thread that receives them, and may be
+--   caught, inspected, and handled by resuming execution.
+-- * /Asynchronous/ exceptions such as 'ThreadKilled' should normally only be
+--   caught temporarily in order to run finalizers, then re-thrown.
+--
+-- 'SlaveThreadCrashed' being asynchronous means it should, by default, cause
+-- the entire thread hierarchy to come crashing down, ultimately terminating the
+-- program.
+--
+-- If you want more sophisticated behavior, such as a "supervisor" thread that
+-- monitors and restarts worker threads when they fail, you have to program
+-- that yourself.
+--
+-- N.B. Consider using a library like
+-- @<https://hackage.haskell.org/package/safe-exceptions safe-exceptions>@ or
+-- @<https://hackage.haskell.org/package/unliftio unliftio>@, which carefully
+-- distinguish synchronous and asynchronous exceptions, unlike @base@.
+data SlaveThreadCrashed
+  = SlaveThreadCrashed !ThreadId !SomeException
+  deriving (Show)
+
+instance Exception SlaveThreadCrashed where
+  toException = asyncExceptionToException
+  fromException = asyncExceptionFromException
 
 -- $note-unmask
 --
