@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -- |
 -- Vanilla thread management in Haskell is low level and
 -- it does not approach the problems related to thread deaths.
@@ -143,13 +144,21 @@ forkFinallyWithUnmask finalizer computation =
 
 killSlaves :: ThreadId -> IO ()
 killSlaves thread = do
+#if MIN_VERSION_stm_containers(1,2,0)
+  threads <- atomically (UnfoldlM.foldM (Foldl.generalize Foldl.revList) (Multimap.unfoldlMByKey thread slaveRegistry))
+#else
   threads <- atomically (UnfoldlM.foldM (Foldl.generalize Foldl.revList) (Multimap.unfoldMByKey thread slaveRegistry))
+#endif
   traverse_ killThread threads
 
 waitForSlavesToDie :: ThreadId -> IO ()
 waitForSlavesToDie thread =
   atomically $ do
+#if MIN_VERSION_stm_containers(1,2,0)
+    null <- UnfoldlM.null $ Multimap.unfoldlMByKey thread slaveRegistry
+#else
     null <- UnfoldlM.null $ Multimap.unfoldMByKey thread slaveRegistry
+#endif
     unless null retry
 
 -- | A slave thread crashed. This exception is classified as /asynchronous/,
