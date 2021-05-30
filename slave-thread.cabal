@@ -62,7 +62,7 @@ library
     deferred-folds >=0.9 && <0.10,
     focus >=1 && <1.1,
     foldl >=1 && <2,
-    stm-containers >=1.1 && <1.2
+    stm-containers >=1.1 && <1.3
 
 test-suite test
   type: exitcode-stdio-1.0
