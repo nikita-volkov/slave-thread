@@ -1,6 +1,8 @@
 module Main where
 
 import Prelude
+import Data.List (isInfixOf)
+import Data.Either (isLeft)
 import Test.QuickCheck.Instances
 import Test.Tasty
 import Test.Tasty.Runners
@@ -33,7 +35,8 @@ main =
       finalizer1Called <- atomically (readTVar finalizer1CalledVar)
       assertEqual "finalizer2 not called" True finalizer2Called
       assertEqual "finalizer1 not called" True finalizer1Called
-      assertEqual "Invalid result" "Left user error (finalizer2 failed)" (show result)
+      assertEqual "result is left" True (isLeft result)
+      assertEqual "Invalid result" True ("finalizer2 failed" `isInfixOf` show result)
     ,
     testCase "Forked threads run fine" $ do
       replicateM_ 100000 $ do
